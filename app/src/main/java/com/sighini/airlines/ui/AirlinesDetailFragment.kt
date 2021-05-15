@@ -6,9 +6,15 @@ import com.google.android.material.appbar.CollapsingToolbarLayout
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
+import androidx.lifecycle.ViewModelProvider
+import com.bumptech.glide.Glide
 import com.sighini.airlines.R
-import com.sighini.airlines.dummy.DummyContent
+import com.sighini.airlines.data.Airline
+import com.sighini.airlines.data.AirlinesDatabase
+import com.sighini.airlines.data.AirlinesRepository
+import com.sighini.airlines.data.getNetworkService
+import com.sighini.airlines.databinding.ItemDetailBinding
+
 
 /**
  * A fragment representing a single Item detail screen.
@@ -18,42 +24,59 @@ import com.sighini.airlines.dummy.DummyContent
  */
 class AirlinesDetailFragment : Fragment() {
 
-    /**
-     * The dummy content this fragment is presenting.
-     */
-    private var item: DummyContent.DummyItem? = null
+    private lateinit var airline: Airline
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         arguments?.let {
-            if (it.containsKey(ARG_ITEM_ID)) {
-                // Load the dummy content specified by the fragment
-                // arguments. In a real-world scenario, use a Loader
-                // to load content from a content provider.
-                item = DummyContent.ITEM_MAP[it.getString(ARG_ITEM_ID)]
-                activity?.findViewById<CollapsingToolbarLayout>(R.id.toolbar_layout)?.title = item?.content
+            if (it.containsKey(ARG_ITEM)) {
+                airline = it.getSerializable(ARG_ITEM) as Airline
+                activity?.findViewById<CollapsingToolbarLayout>(R.id.toolbar_layout)?.title = airline.usName
             }
         }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View? {
-        val rootView = inflater.inflate(R.layout.item_detail, container, false)
 
-        // Show the dummy content as text in a TextView.
-        item?.let {
-            rootView.findViewById<TextView>(R.id.item_detail).text = it.details
+        val binding = ItemDetailBinding.inflate(layoutInflater)
+        val rootView = binding.root
+        //val rootView = inflater.inflate(R.layout.item_detail, container, false)
+
+        airline?.let {
+            airline.logoURL?.let {
+                Glide.with(binding.logo.context)
+                        .load(AirlinesRepository.BASE_URL + airline.logoURL)
+                        .into(binding.logo)
+            }
+            binding.name.text = airline.name
+            binding.siteUrl.text = airline.site
+            binding.phoneNumber.text = airline.phone
+            updateFavorite(binding)
+            binding.favorite.setOnClickListener(View.OnClickListener {
+                airline.favorite = !airline.favorite
+                updateFavorite(binding)
+            })
         }
 
         return rootView
     }
 
+    fun updateFavorite(binding: ItemDetailBinding) {
+        if (airline.favorite) {
+            binding.favorite.setBackgroundResource(R.drawable.favorite)
+        } else {
+            binding.favorite.setBackgroundResource(R.drawable.unfavorite)
+        }
+        //Persist the favorite status
+    }
+
     companion object {
         /**
-         * The fragment argument representing the item ID that this fragment
+         * The fragment argument representing the Airline that this fragment
          * represents.
          */
-        const val ARG_ITEM_ID = "item_id"
+        const val ARG_ITEM = "item"
     }
 }

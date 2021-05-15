@@ -6,15 +6,17 @@ import androidx.core.widget.NestedScrollView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.RecyclerView
 import androidx.appcompat.widget.Toolbar
-import com.google.android.material.floatingactionbutton.FloatingActionButton
-import com.google.android.material.snackbar.Snackbar
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import com.sighini.airlines.R
+import com.sighini.airlines.data.AirlinesDatabase
+import com.sighini.airlines.data.AirlinesRepository
+import com.sighini.airlines.data.getNetworkService
 
-import com.sighini.airlines.dummy.DummyContent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 /**
  * An activity representing a list of Pings. This activity
@@ -26,6 +28,13 @@ import com.sighini.airlines.dummy.DummyContent
  */
 class AirlinesListActivity : AppCompatActivity() {
 
+    private val airlinesViewModel: AirlinesViewModel by lazy {
+        val database = AirlinesDatabase.getInstance(this)
+        val repository = AirlinesRepository.getInstance(database.airlinesDao, getNetworkService())
+        ViewModelProvider(this, AirlinesViewModel.FACTORY(repository)).get(AirlinesViewModel::class.java)
+    }
+
+    private lateinit var adapter: AirlinesAdapter
     /**
      * Whether or not the activity is in two-pane mode, i.e. running on a tablet
      * device.
@@ -37,7 +46,6 @@ class AirlinesListActivity : AppCompatActivity() {
         setContentView(R.layout.activity_item_list)
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
         toolbar.title = title
 
 //        findViewById<FloatingActionButton>(R.id.fab).setOnClickListener { view ->
@@ -54,68 +62,39 @@ class AirlinesListActivity : AppCompatActivity() {
         }
 
         setupRecyclerView(findViewById(R.id.item_list))
+
+        lifecycleScope.launch {
+            @OptIn(ExperimentalCoroutinesApi::class)
+            airlinesViewModel.items.collectLatest {
+                adapter.submitData(it)
+            }
+        }
+
+        airlinesViewModel.selectedAirline.observe(this, Observer {
+            if (twoPane) {
+                val fragment = AirlinesDetailFragment().apply {
+                    arguments = Bundle().apply {
+                        putSerializable(AirlinesDetailFragment.ARG_ITEM, it)
+                    }
+                }
+                supportFragmentManager
+                        .beginTransaction()
+                        .replace(R.id.item_detail_container, fragment)
+                        .commit()
+            } else {
+                val intent = Intent(this, AirlinesDetailActivity::class.java).apply {
+                    putExtra(AirlinesDetailFragment.ARG_ITEM, it)
+                }
+                startActivity(intent)
+            }
+        })
     }
 
     private fun setupRecyclerView(recyclerView: RecyclerView) {
-        recyclerView.adapter =
-            SimpleItemRecyclerViewAdapter(
-                this,
-                DummyContent.ITEMS,
-                twoPane
-            )
+        adapter = AirlinesAdapter(AirlinesAdapter.AirlineClickListener {
+            airlinesViewModel.selectItem(it)
+        } )
+        recyclerView.adapter = adapter
     }
 
-    class SimpleItemRecyclerViewAdapter(private val parentActivity: AirlinesListActivity,
-                                        private val values: List<DummyContent.DummyItem>,
-                                        private val twoPane: Boolean) :
-            RecyclerView.Adapter<SimpleItemRecyclerViewAdapter.ViewHolder>() {
-
-        private val onClickListener: View.OnClickListener
-
-        init {
-            onClickListener = View.OnClickListener { v ->
-                val item = v.tag as DummyContent.DummyItem
-                if (twoPane) {
-                    val fragment = AirlinesDetailFragment().apply {
-                        arguments = Bundle().apply {
-                            putString(AirlinesDetailFragment.ARG_ITEM_ID, item.id)
-                        }
-                    }
-                    parentActivity.supportFragmentManager
-                            .beginTransaction()
-                            .replace(R.id.item_detail_container, fragment)
-                            .commit()
-                } else {
-                    val intent = Intent(v.context, AirlinesDetailActivity::class.java).apply {
-                        putExtra(AirlinesDetailFragment.ARG_ITEM_ID, item.id)
-                    }
-                    v.context.startActivity(intent)
-                }
-            }
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context)
-                    .inflate(R.layout.item_list_content, parent, false)
-            return ViewHolder(view)
-        }
-
-        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-            val item = values[position]
-            holder.idView.text = item.id
-            holder.contentView.text = item.content
-
-            with(holder.itemView) {
-                tag = item
-                setOnClickListener(onClickListener)
-            }
-        }
-
-        override fun getItemCount() = values.size
-
-        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-            val idView: TextView = view.findViewById(R.id.id_text)
-            val contentView: TextView = view.findViewById(R.id.content)
-        }
-    }
 }

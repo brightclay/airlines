@@ -43,9 +43,9 @@ class AirlinesDetailActivity : AppCompatActivity() {
             // using a fragment transaction.
             val fragment = AirlinesDetailFragment().apply {
                 arguments = Bundle().apply {
-                    putString(
-                        AirlinesDetailFragment.ARG_ITEM_ID,
-                            intent.getStringExtra(AirlinesDetailFragment.ARG_ITEM_ID))
+                    putSerializable(
+                        AirlinesDetailFragment.ARG_ITEM,
+                            intent.getSerializableExtra(AirlinesDetailFragment.ARG_ITEM))
                 }
             }
 
